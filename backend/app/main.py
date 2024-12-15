@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import tasks  # Import the tasks router
-from .database import engine, Base  # You can remove Base if not used elsewhere
+from .database import engine, Base  # Ensure these are correctly imported
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -20,4 +20,5 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
+# Include the tasks router with the updated prefix
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])

@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from ..database import models, schemas, SessionLocal
+from ..database import models, schemas
+from ..database.database import SessionLocal, engine
 import uuid
+
+# Remove or comment out the following line
+# models.Base.metadata.create_all(bind=engine)
 
 router = APIRouter()
 
@@ -13,6 +17,26 @@ def get_db():
         yield db
     finally:
         db.close()
+
+@router.post("/", response_model=schemas.TaskSchema)
+def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
+    db_task = models.Task(
+        content=task.content,
+        description=task.description,
+        priority=task.priority,
+        due=task.due,
+        labels=task.labels,
+        completed=task.completed
+    )
+    db.add(db_task)
+    db.commit()
+    db.refresh(db_task)
+    return db_task
+
+@router.get("/", response_model=List[schemas.TaskSchema])
+def read_tasks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    tasks = db.query(models.Task).offset(skip).limit(limit).all()
+    return tasks
 
 @router.get("/seed_tasks", response_model=List[schemas.TaskSchema])
 def seed_tasks(db: Session = Depends(get_db)):
@@ -48,36 +72,12 @@ def seed_tasks(db: Session = Depends(get_db)):
     
     return sample_tasks
 
-@router.get("/", response_model=List[schemas.TaskSchema])
-def read_tasks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    print("\n--- BACKEND TASK RETRIEVAL ---")
-    tasks = db.query(models.Task).offset(skip).limit(limit).all()
-    
-    print(f"Total tasks found: {len(tasks)}")
-    for task in tasks:
-        print(f"Task ID: {task.id}")
-        print(f"Content: {task.content}")
-        print(f"Description: {task.description}")
-        print(f"Priority: {task.priority}")
-        print(f"Completed: {task.completed}")
-        print("---")
-    
-    return tasks
-
 @router.get("/{task_id}", response_model=schemas.TaskSchema)
 def read_task(task_id: str, db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
-
-@router.post("/", response_model=schemas.TaskSchema)
-def create_task(task: schemas.TaskSchema, db: Session = Depends(get_db)):
-    db_task = models.Task(**task.dict())
-    db.add(db_task)
-    db.commit()
-    db.refresh(db_task)
-    return db_task
 
 @router.put("/{task_id}", response_model=schemas.TaskSchema)
 def update_task(task_id: str, updated_task: schemas.TaskSchema, db: Session = Depends(get_db)):
